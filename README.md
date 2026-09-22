@@ -1,6 +1,6 @@
 # a2a — Agent2Agent servers for public data
 
-Five A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
+Seven A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
 speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
 notifications when the public data it watches changes.
 
@@ -14,11 +14,14 @@ production paths.
 | [`servers/nycwater`](servers/nycwater) | NYC Drinking Water Agent | `water-quality`, `water-sites`, `water-watch` | First drinking-water-quality agent of any kind (172K DEP distribution samples, published as monitoring-site codes) |
 | [`servers/nws`](servers/nws) | NWS Weather Alerts Agent | `alerts-active`, `alerts-summary`, `alerts-watch` | First National Weather Service agent: active alerts by state, point or severity, straight from `api.weather.gov` |
 | [`servers/quakes`](servers/quakes) | USGS Earthquake Agent | `quakes-recent`, `quakes-near`, `quakes-summary`, `quakes-watch` | First earthquake agent on the USGS catalog — worldwide or within N km of any point, with a magnitude-threshold watch |
+| [`servers/tides`](servers/tides) | NOAA Tides Agent | `tide-predictions`, `tide-next`, `water-level`, `stations`, `tide-watch` | First tide agent: NOAA CO-OPS high/low predictions and observed water levels for 3,499 stations, placed against published flood stages, with a crossing watch |
+| [`servers/recalls`](servers/recalls) | openFDA Recalls Agent | `recalls-recent`, `recall-search`, `recalls-summary`, `recall-lookup`, `recalls-watch` | First product-recall agent: openFDA drug, food and device enforcement reports (87,000+ records), with counts by classification and a new-recall watch |
 
 Public A2A servers today are almost all crypto bots, dev tooling, and B2B AI shops.
-No city, water utility, weather service, geological survey, transit agency, or hospital
-publishes an agent card. These five take the first slots in that gap — see
-[`docs/gap-research.md`](docs/gap-research.md) for the survey behind that claim (and its caveats).
+No city, water utility, weather service, geological survey, oceanographic service, food
+safety regulator, transit agency, or hospital publishes an agent card. These seven take
+the first slots in that gap — see [`docs/gap-research.md`](docs/gap-research.md) for the
+survey behind that claim (and its caveats).
 
 ## Quick start
 
@@ -29,6 +32,8 @@ python3 servers/nycflood/server.py      # http://127.0.0.1:8788
 python3 servers/nycwater/server.py      # http://127.0.0.1:8789
 python3 servers/nws/server.py           # http://127.0.0.1:8791  (set NWS_USER_AGENT)
 python3 servers/quakes/server.py        # http://127.0.0.1:8792
+python3 servers/tides/server.py         # http://127.0.0.1:8793
+python3 servers/recalls/server.py       # http://127.0.0.1:8796
 
 # terminal 2 — optional: watch pushes arrive
 python3 tools/webhook_receiver.py --port 8799
@@ -90,9 +95,11 @@ python3 servers/nycflood/tests/test_agent.py
 python3 servers/nycwater/tests/test_agent.py
 python3 servers/nws/tests/test_agent.py
 python3 servers/quakes/tests/test_agent.py
+python3 servers/tides/tests/test_agent.py
+python3 servers/recalls/tests/test_agent.py
 ```
 
-157 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
+242 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
 and retries, dataset validation, SOQL escaping, skill parsing, and one full
 in-process HTTP + SSE test.
 
@@ -105,8 +112,8 @@ NYC311_ALLOW_PRIVATE_WEBHOOKS=1 python3 servers/nyc311/server.py
 python3 servers/nyc311/tools/smoke.py
 ```
 
-92 checks across the five smoke scripts: card, real lookup, `input-required`
-continuation, SSE stream, push-config CRUD. One command runs all five:
+146 checks across the seven smoke scripts: card, real lookup, `input-required`
+continuation, SSE stream, push-config CRUD. One command runs all seven:
 
 ```bash
 python3 tools/smoke_all.py
@@ -127,10 +134,16 @@ its own prefix so the three can run side by side:
 | `<PREFIX>_WATCH_INTERVAL` | Seconds between webhook watches (floor: 5) |
 | `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS` | `1` allows loopback webhook URLs — local demos only |
 
-Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`.
+Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`, `NOAA_TIDES`, `OPENFDA`.
 
-`NWS_USER_AGENT` and `USGS_USER_AGENT` matter: both agencies ask that callers
-identify themselves with a contactable address, and NWS returns 403 without one.
+`NWS_USER_AGENT`, `USGS_USER_AGENT` and `NOAA_TIDES_USER_AGENT` matter: those agencies
+ask that callers identify themselves with a contactable address, and NWS returns 403
+without one. `OPENFDA_API_KEY` is optional — openFDA works keyless and a key only
+raises the rate limit to 240 requests/minute.
+
+NOAA's tide server also reads `NOAA_TIDES_UNITS` (feet or metres), `NOAA_TIDES_DATUM`
+(the reference level heights are measured from, default MLLW) and
+`NOAA_TIDES_STATION_TTL` (the 2 MB station catalogue cache, default one day).
 
 ## Honest limits
 
@@ -146,6 +159,13 @@ identify themselves with a contactable address, and NWS returns 403 without one.
 - **Alerts and quakes are read, not predicted.** The NWS endpoint returns what is
   *currently in effect* and drops alerts the moment they expire, so an empty answer is
   not a forecast. USGS is a catalog of what already happened.
+- **Tide answers are NOAA's predictions, not measurements.** `tide-predictions` and
+  `tide-next` repeat NOAA's astronomical predictions; `water-level` is the observed
+  reading and says whether NOAA has verified it yet. Height datums are named in every
+  answer because 2 ft over MLLW means nothing without the datum.
+- **openFDA records are unvalidated.** The agency's own disclaimer travels in every
+  recall answer, recalls can be corrected or withdrawn after publication, and an empty
+  result means "nothing published matches" — not "nothing is happening".
 - **Rate limits.** No app token means light use only; the kit caches per query and
   the watcher polls on a timer rather than per request.
 

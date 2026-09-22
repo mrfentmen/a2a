@@ -24,13 +24,15 @@ from urllib import error, request
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: name, port, env prefix, default USER_AGENT variable (None when the feed has none)
+#: name, port, env prefix, USER_AGENT variable to set (None when the feed does not ask)
 SERVERS = (
     ("nyc311", 8787, "NYC311", None),
     ("nycflood", 8788, "NYC_FLOOD", None),
     ("nycwater", 8789, "NYC_WATER", None),
     ("nws", 8791, "NWS", "NWS_USER_AGENT"),
     ("quakes", 8792, "USGS", "USGS_USER_AGENT"),
+    ("tides", 8793, "NOAA_TIDES", "NOAA_TIDES_USER_AGENT"),
+    ("recalls", 8796, "OPENFDA", "OPENFDA_USER_AGENT"),
 )
 
 USER_AGENT = "a2a-smoke-all/1.0 (+https://github.com/mrfentmen/a2a)"
