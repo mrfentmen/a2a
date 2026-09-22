@@ -1,6 +1,6 @@
 # a2a — Agent2Agent servers for public data
 
-Three A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
+Five A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
 speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
 notifications when the public data it watches changes.
 
@@ -12,11 +12,13 @@ production paths.
 | [`servers/nyc311`](servers/nyc311) | NYC Open Data Agent | `complaint-status`, `complaints-near` | First city government A2A server (public agent card for 311 data) |
 | [`servers/nycflood`](servers/nycflood) | NYC Street Flooding Agent | `flood-recent`, `flood-sensors`, `flood-watch` | First street-flooding sensor agent; the only municipal dataset here that is genuinely event-shaped, which makes the push notification a real alert |
 | [`servers/nycwater`](servers/nycwater) | NYC Drinking Water Agent | `water-quality`, `water-sites`, `water-watch` | First drinking-water-quality agent of any kind (172K DEP distribution samples, published as monitoring-site codes) |
+| [`servers/nws`](servers/nws) | NWS Weather Alerts Agent | `alerts-active`, `alerts-summary`, `alerts-watch` | First National Weather Service agent: active alerts by state, point or severity, straight from `api.weather.gov` |
+| [`servers/quakes`](servers/quakes) | USGS Earthquake Agent | `quakes-recent`, `quakes-near`, `quakes-summary`, `quakes-watch` | First earthquake agent on the USGS catalog — worldwide or within N km of any point, with a magnitude-threshold watch |
 
 Public A2A servers today are almost all crypto bots, dev tooling, and B2B AI shops.
-No city, water utility, transit agency, or hospital publishes an agent card. These
-three take the first slots in that gap — see [`docs/gap-research.md`](docs/gap-research.md)
-for the survey behind that claim (and its caveats).
+No city, water utility, weather service, geological survey, transit agency, or hospital
+publishes an agent card. These five take the first slots in that gap — see
+[`docs/gap-research.md`](docs/gap-research.md) for the survey behind that claim (and its caveats).
 
 ## Quick start
 
@@ -25,6 +27,8 @@ for the survey behind that claim (and its caveats).
 python3 servers/nyc311/server.py        # http://127.0.0.1:8787
 python3 servers/nycflood/server.py      # http://127.0.0.1:8788
 python3 servers/nycwater/server.py      # http://127.0.0.1:8789
+python3 servers/nws/server.py           # http://127.0.0.1:8791  (set NWS_USER_AGENT)
+python3 servers/quakes/server.py        # http://127.0.0.1:8792
 
 # terminal 2 — optional: watch pushes arrive
 python3 tools/webhook_receiver.py --port 8799
@@ -63,7 +67,8 @@ a2a_kit/          the reusable server kit (stdlib only, no dependencies)
   store.py        SQLite task + push-config store
   push.py         the watcher thread that fires webhooks
   httpd.py        agent card, HTTP routes, SSE writer
-  socrata.py      Socrata/SODA client base: caching, SOQL escaping, freshness
+  jsonapi.py      keyless JSON API client base: caching, validation, freshness
+  socrata.py      Socrata/SODA client built on jsonapi: SOQL escaping, row ids
   cli.py          one CLI for every server
   smoke.py        shared smoke-check helper
 servers/<name>/   data.py (dataset client) · agent.py (skills) · server.py (main)
@@ -83,9 +88,11 @@ python3 tests/test_kit.py
 python3 servers/nyc311/tests/test_agent.py
 python3 servers/nycflood/tests/test_agent.py
 python3 servers/nycwater/tests/test_agent.py
+python3 servers/nws/tests/test_agent.py
+python3 servers/quakes/tests/test_agent.py
 ```
 
-99 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
+157 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
 and retries, dataset validation, SOQL escaping, skill parsing, and one full
 in-process HTTP + SSE test.
 
@@ -98,8 +105,12 @@ NYC311_ALLOW_PRIVATE_WEBHOOKS=1 python3 servers/nyc311/server.py
 python3 servers/nyc311/tools/smoke.py
 ```
 
-52 checks across the three smoke scripts: card, real lookup, `input-required`
-continuation, SSE stream, push-config CRUD.
+92 checks across the five smoke scripts: card, real lookup, `input-required`
+continuation, SSE stream, push-config CRUD. One command runs all five:
+
+```bash
+python3 tools/smoke_all.py
+```
 
 ## Configuration
 
@@ -116,7 +127,10 @@ its own prefix so the three can run side by side:
 | `<PREFIX>_WATCH_INTERVAL` | Seconds between webhook watches (floor: 5) |
 | `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS` | `1` allows loopback webhook URLs — local demos only |
 
-Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`.
+Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`.
+
+`NWS_USER_AGENT` and `USGS_USER_AGENT` matter: both agencies ask that callers
+identify themselves with a contactable address, and NWS returns 403 without one.
 
 ## Honest limits
 
@@ -129,6 +143,9 @@ Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`.
 - **Private webhook URLs are blocked by default.** Allow them only for local demos.
   Hostname webhooks are not DNS-resolved before use, so a determined caller could
   point one at an internal name — put these servers behind an egress firewall.
+- **Alerts and quakes are read, not predicted.** The NWS endpoint returns what is
+  *currently in effect* and drops alerts the moment they expire, so an empty answer is
+  not a forecast. USGS is a catalog of what already happened.
 - **Rate limits.** No app token means light use only; the kit caches per query and
   the watcher polls on a timer rather than per request.
 

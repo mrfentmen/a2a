@@ -8,6 +8,7 @@ task lifecycle, webhook push notifications, SQLite persistence).
 from .cli import run_agent_server
 from .errors import A2AError, ERROR_CODES, SkillAgent, UpstreamError, agent_message, error, new_id, now_iso
 from .httpd import PROTOCOL_VERSION, AgentServerApp, build_agent_card, make_handler, serve
+from .jsonapi import DEFAULT_USER_AGENT, JsonApiClient
 from .protocol import A2AHandler
 from .push import PushWatcher
 from .socrata import SocrataClient, soql_escape, utc_now_iso
@@ -17,8 +18,10 @@ __all__ = [
     "A2AError",
     "A2AHandler",
     "AgentServerApp",
+    "DEFAULT_USER_AGENT",
     "ERROR_CODES",
     "INTERRUPTED_STATES",
+    "JsonApiClient",
     "PROTOCOL_VERSION",
     "PushWatcher",
     "SocrataClient",
