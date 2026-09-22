@@ -34,6 +34,25 @@
 
 ---
 
+## 0b. Built since this research (this repo's own answers)
+
+Gaps from the list below that are now closed by code in this repository — listed here so the
+"first of its kind" claims stay checkable against what was built:
+
+| Gap from this doc | Built | Server / agent |
+|---|---|---|
+| #3 city / municipal A2A | NYC 311 agent card, live on NYC Open Data | `servers/nyc311` (a2a) |
+| A — municipal sensor nets | FloodNet street-flooding agent with a flood watch; DEP tap-water agent | `servers/nycflood`, `servers/nycwater` (a2a) |
+| A — government feeds with no agent face | NWS alerts, USGS earthquakes, NOAA tides, openFDA recalls (each previously had no card) | `servers/nws`, `servers/quakes`, `servers/tides`, `servers/recalls` (a2a) |
+| G — real, unserved niches | Space weather (SWPC Kp + OVATION aurora probability) and wildfire (NIFC WFIGS incidents) | `servers/aurora`, `servers/fire` (a2a) |
+| #2 non-coding ACP agents | Civic, hazards, Treasury, NHTSA vehicles, plus the ACP→A2A bridge | `acp` repo |
+| #10 ACP↔A2A bridge beyond coding | A bridge that also relays A2A push notifications into the editor session | `acp/agents/a2a_bridge` |
+
+Unbuilt gaps that remain open here: the official registry, card security scanning, certifiable
+conformance, smart-home, healthcare, travel booking, enterprise payment metering.
+
+---
+
 ## 1. Ground truth — what already exists (so "new" means new)
 
 ### ACP (Agent Client Protocol) — editor ↔ agent

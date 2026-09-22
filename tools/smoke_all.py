@@ -7,7 +7,8 @@ Each server gets its own port, its own SQLite file (in a temp dir, so a run neve
 touches committed data) and `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS=1` so the push-config
 checks can register a loopback webhook. Exits non-zero if any server fails.
 
-Live network: every check reads the real upstream API (NYC Open Data, NWS, USGS).
+Live network: every check reads the real upstream API (NYC Open Data, NWS, USGS, NOAA
+SWPC, NIFC, openFDA).
 """
 
 from __future__ import annotations
@@ -32,6 +33,8 @@ SERVERS = (
     ("nws", 8791, "NWS", "NWS_USER_AGENT"),
     ("quakes", 8792, "USGS", "USGS_USER_AGENT"),
     ("tides", 8793, "NOAA_TIDES", "NOAA_TIDES_USER_AGENT"),
+    ("aurora", 8794, "AURORA", "AURORA_USER_AGENT"),
+    ("fire", 8795, "FIRE", "FIRE_USER_AGENT"),
     ("recalls", 8796, "OPENFDA", "OPENFDA_USER_AGENT"),
 )
 

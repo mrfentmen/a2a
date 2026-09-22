@@ -1,6 +1,7 @@
 # NYC Open Data → A2A Skills — verified catalog
 
-**Verified:** 2026-09-22, against the live Socrata APIs (not blog summaries).
+**Verified:** 2026-09-22, against the live Socrata APIs (not blog summaries). §9 covers the
+non-NYC datasets used by the later servers in this repo.
 **Endpoint pattern:** `https://data.cityofnewyork.us/resource/<id>.json` — public, read-only, no key needed for light use (an app token raises rate limits).
 **How each row was checked:** Socrata Discovery API for existence + freshness, then a live `$limit=1` probe for real field names, then `count(*)` where a row count is shown. Official dataset names pulled from `https://data.cityofnewyork.us/api/views/<id>.json`.
 
@@ -206,3 +207,29 @@ The best *new* skill is **street flooding right now** (`aq7i-eu5q`): it is the o
 Everything else in 8b is static or facility data: good reference skills, weak watch/push skills.
 
 Two of the earlier §3 limits still hold after this sweep: there is **no** public NYC API for *filing* a 311 complaint, and **no** MTA subway real-time arrivals in NYC Open Data (separate agency, keyed feeds).
+
+---
+
+## 9. Non-NYC datasets, verified for the later servers
+
+Each row was probed live on 2026-09-22 with a real request returning real rows (that is how the
+field lists and quirks in the servers' `data.py` docstrings were written, not from documentation).
+All keyless unless noted.
+
+| Dataset | Endpoint | Verified with | Fields used | Server |
+|---|---|---|---|---|
+| NWS active alerts | `api.weather.gov/alerts/active` | county-wide query + counts | id, event, severity, onset, ends, headline, instruction, areaDesc | `servers/nws` |
+| USGS earthquakes | `earthquake.usgs.gov/fdsnws/event/1/query` (GeoJSON) | a real event + counts | ids, mag, place, time, coordinates, depth, tsunami flag, felt/alerts | `servers/quakes` |
+| NOAA CO-OPS predictions, observations, stations | `api.tidesandcurrents.noaa.gov` | station catalogue (3,499) + a real prediction series | t/v (time, value), sigma, flags, station metadata, flood stages | `servers/tides` |
+| openFDA drug / food / device enforcement | `api.fda.gov/{drug,food,device}/enforcement.json` | `count=classification.exact` + a real record | recall_number, classification, product_description, reason_for_recall, status, report_date, distribution_pattern | `servers/recalls` |
+| NOAA SWPC: Kp (1-minute, 3-hourly, forecast), alerts, OVATION | `services.swpc.noaa.gov/products/noaa-planetary-k-index.json`, `.../-forecast.json`, `.../alerts.json`, `/json/planetary_k_index_1m.json`, `/json/ovation_aurora_latest.json` | live rows for each, including the 65,160-cell OVATION grid | time_tag, Kp, estimated_kp, a_running, observed/predicted, product_id/issue_datetime/message, coordinates [lon, lat, probability] | `servers/aurora` |
+| NIFC WFIGS current incidents | `services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query` | `returnCountOnly` (450 rows), a state filter, and a 100-mile distance query | IncidentName, IncidentSize, PercentContained, FireDiscoveryDateTime (epoch ms), IncidentTypeCategory, POOState, POOCounty, FireCause, GACC, UniqueFireIdentifier, geometry x/y | `servers/fire` |
+
+Quirks worth remembering (all handled in the servers):
+
+- SWPC ships bare JSON arrays for four of the five products, mixes observed and predicted rows in
+  one forecast file, and serves a ~900 KB aurora grid.
+- WFIGS answers unknown or malformed `where` clauses with a JSON `error` object, not an HTTP error;
+  its dates are epoch milliseconds; the layer caps a response at 2,000 rows.
+- An unknown make or model on NHTSA's recall API answers HTTP 400 with an empty result set (used by
+  the `acp` repo's vehicles agent, same idea).

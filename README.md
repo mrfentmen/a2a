@@ -1,6 +1,6 @@
 # a2a — Agent2Agent servers for public data
 
-Seven A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
+Nine A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
 speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
 notifications when the public data it watches changes.
 
@@ -16,10 +16,13 @@ production paths.
 | [`servers/quakes`](servers/quakes) | USGS Earthquake Agent | `quakes-recent`, `quakes-near`, `quakes-summary`, `quakes-watch` | First earthquake agent on the USGS catalog — worldwide or within N km of any point, with a magnitude-threshold watch |
 | [`servers/tides`](servers/tides) | NOAA Tides Agent | `tide-predictions`, `tide-next`, `water-level`, `stations`, `tide-watch` | First tide agent: NOAA CO-OPS high/low predictions and observed water levels for 3,499 stations, placed against published flood stages, with a crossing watch |
 | [`servers/recalls`](servers/recalls) | openFDA Recalls Agent | `recalls-recent`, `recall-search`, `recalls-summary`, `recall-lookup`, `recalls-watch` | First product-recall agent: openFDA drug, food and device enforcement reports (87,000+ records), with counts by classification and a new-recall watch |
+| [`servers/aurora`](servers/aurora) | Aurora Space Weather Agent | `aurora-now`, `aurora-forecast`, `aurora-visibility`, `aurora-messages`, `aurora-watch` | First space-weather agent: NOAA SWPC's Kp index and storm messages, plus the OVATION model's aurora probability at any point, with a storm watch |
+| [`servers/fire`](servers/fire) | Wildfire Incident Agent | `fire-active`, `fire-near`, `fire-summary`, `fire-lookup`, `fire-watch` | First wildfire agent: the interagency WFIGS incident layer (active fires, acreage, containment, real distances), with a new-large-fire watch |
 
 Public A2A servers today are almost all crypto bots, dev tooling, and B2B AI shops.
 No city, water utility, weather service, geological survey, oceanographic service, food
-safety regulator, transit agency, or hospital publishes an agent card. These seven take
+safety regulator, space-weather center, land-management agency, transit agency, or
+hospital publishes an agent card. These nine take
 the first slots in that gap — see [`docs/gap-research.md`](docs/gap-research.md) for the
 survey behind that claim (and its caveats).
 
@@ -33,6 +36,8 @@ python3 servers/nycwater/server.py      # http://127.0.0.1:8789
 python3 servers/nws/server.py           # http://127.0.0.1:8791  (set NWS_USER_AGENT)
 python3 servers/quakes/server.py        # http://127.0.0.1:8792
 python3 servers/tides/server.py         # http://127.0.0.1:8793
+python3 servers/aurora/server.py        # http://127.0.0.1:8794
+python3 servers/fire/server.py          # http://127.0.0.1:8795
 python3 servers/recalls/server.py       # http://127.0.0.1:8796
 
 # terminal 2 — optional: watch pushes arrive
@@ -96,10 +101,12 @@ python3 servers/nycwater/tests/test_agent.py
 python3 servers/nws/tests/test_agent.py
 python3 servers/quakes/tests/test_agent.py
 python3 servers/tides/tests/test_agent.py
+python3 servers/aurora/tests/test_agent.py
+python3 servers/fire/tests/test_agent.py
 python3 servers/recalls/tests/test_agent.py
 ```
 
-242 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
+307 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
 and retries, dataset validation, SOQL escaping, skill parsing, and one full
 in-process HTTP + SSE test.
 
@@ -112,8 +119,8 @@ NYC311_ALLOW_PRIVATE_WEBHOOKS=1 python3 servers/nyc311/server.py
 python3 servers/nyc311/tools/smoke.py
 ```
 
-146 checks across the seven smoke scripts: card, real lookup, `input-required`
-continuation, SSE stream, push-config CRUD. One command runs all seven:
+202 checks across the nine smoke scripts: card, real lookup, `input-required`
+continuation, SSE stream, push-config CRUD. One command runs all nine:
 
 ```bash
 python3 tools/smoke_all.py
@@ -134,11 +141,13 @@ its own prefix so the three can run side by side:
 | `<PREFIX>_WATCH_INTERVAL` | Seconds between webhook watches (floor: 5) |
 | `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS` | `1` allows loopback webhook URLs — local demos only |
 
-Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`, `NOAA_TIDES`, `OPENFDA`.
+Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`, `NOAA_TIDES`, `AURORA`, `FIRE`,
+`OPENFDA`.
 
 `NWS_USER_AGENT`, `USGS_USER_AGENT` and `NOAA_TIDES_USER_AGENT` matter: those agencies
 ask that callers identify themselves with a contactable address, and NWS returns 403
-without one. `OPENFDA_API_KEY` is optional — openFDA works keyless and a key only
+without one. SWPC and NIFC are happy keyless, so `AURORA_USER_AGENT` and `FIRE_USER_AGENT`
+are good manners rather than requirements. `OPENFDA_API_KEY` is optional — openFDA works keyless and a key only
 raises the rate limit to 240 requests/minute.
 
 NOAA's tide server also reads `NOAA_TIDES_UNITS` (feet or metres), `NOAA_TIDES_DATUM`
@@ -163,6 +172,16 @@ NOAA's tide server also reads `NOAA_TIDES_UNITS` (feet or metres), `NOAA_TIDES_D
   `tide-next` repeat NOAA's astronomical predictions; `water-level` is the observed
   reading and says whether NOAA has verified it yet. Height datums are named in every
   answer because 2 ft over MLLW means nothing without the datum.
+- **Aurora answers are model output, not sightings.** `aurora-visibility` reports NOAA's
+  OVATION probability of aurora *overhead* at a point, with the model run time; it says
+  nothing about clouds, so every answer tells the caller to check a weather forecast too.
+  The Kp forecast beyond about a day is low-confidence by NOAA's own account, and the
+  city coordinates for named places come from the server's own list, not from NOAA —
+  pass a latitude/longitude for an exact point.
+- **Wildfire acreage is what agencies reported, not what a satellite sees.** WFIGS holds
+  only incidents that are still active, so a fire leaving the list means it closed out,
+  not that it never existed; `fire-near` distances are great-circle miles to the reported
+  point and are not a risk assessment or an evacuation notice.
 - **openFDA records are unvalidated.** The agency's own disclaimer travels in every
   recall answer, recalls can be corrected or withdrawn after publication, and an empty
   result means "nothing published matches" — not "nothing is happening".
