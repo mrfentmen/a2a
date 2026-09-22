@@ -1,0 +1,144 @@
+# a2a — Agent2Agent servers for public data
+
+Three A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
+speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
+notifications when the public data it watches changes.
+
+Everything runs on public open data. No API keys, no scraping, no fake fixtures in
+production paths.
+
+| Server | Agent card | Skills | Novelty |
+|---|---|---|---|
+| [`servers/nyc311`](servers/nyc311) | NYC Open Data Agent | `complaint-status`, `complaints-near` | First city government A2A server (public agent card for 311 data) |
+| [`servers/nycflood`](servers/nycflood) | NYC Street Flooding Agent | `flood-recent`, `flood-sensors`, `flood-watch` | First street-flooding sensor agent; the only municipal dataset here that is genuinely event-shaped, which makes the push notification a real alert |
+| [`servers/nycwater`](servers/nycwater) | NYC Drinking Water Agent | `water-quality`, `water-sites`, `water-watch` | First drinking-water-quality agent of any kind (172K DEP distribution samples, published as monitoring-site codes) |
+
+Public A2A servers today are almost all crypto bots, dev tooling, and B2B AI shops.
+No city, water utility, transit agency, or hospital publishes an agent card. These
+three take the first slots in that gap — see [`docs/gap-research.md`](docs/gap-research.md)
+for the survey behind that claim (and its caveats).
+
+## Quick start
+
+```bash
+# terminal 1 — a server (each defaults to its own port)
+python3 servers/nyc311/server.py        # http://127.0.0.1:8787
+python3 servers/nycflood/server.py      # http://127.0.0.1:8788
+python3 servers/nycwater/server.py      # http://127.0.0.1:8789
+
+# terminal 2 — optional: watch pushes arrive
+python3 tools/webhook_receiver.py --port 8799
+
+# terminal 3 — read the card, ask a question
+curl -s localhost:8787/.well-known/agent-card.json | python3 -m json.tool
+curl -s localhost:8787/ -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":"1","method":"message/send",
+  "params":{"message":{"kind":"message","role":"user","messageId":"m1",
+  "parts":[{"kind":"text","text":"Which streets flooded in the last 30 days?"}]}}}' | python3 -m json.tool
+```
+
+Ask that second question against port **8788** to see live FloodNet results.
+
+## Protocol coverage
+
+| A2A feature | Where it lives |
+|---|---|
+| Agent card at `/.well-known/agent-card.json` (plus legacy `agent.json`) | `a2a_kit/httpd.py` |
+| `message/send` with `returnImmediately` (background task + polling) | `a2a_kit/protocol.py` |
+| `message/stream` — SSE: task, status-update, artifact-update | `a2a_kit/httpd.py` |
+| Task lifecycle: submitted → working → completed / failed / input-required / canceled | `a2a_kit/protocol.py`, `a2a_kit/store.py` |
+| Multi-turn `input-required` continuation in one task | `a2a_kit/protocol.py` (`_merge`) |
+| `tasks/get` (with `historyLength`), `tasks/cancel`, `tasks/resubscribe` | `a2a_kit/protocol.py` |
+| `tasks/pushNotificationConfig/{set,get,list,delete}` | `a2a_kit/protocol.py` |
+| Server-initiated push: poll the dataset, POST a `status-update` event | `a2a_kit/push.py` |
+| Error codes per the official SDK map (-32001 … -32603) | `a2a_kit/errors.py` |
+| SQLite persistence for tasks and push configs | `a2a_kit/store.py` |
+
+## Reading the code
+
+```
+a2a_kit/          the reusable server kit (stdlib only, no dependencies)
+  errors.py       error codes + the SkillAgent contract every server implements
+  protocol.py     JSON-RPC methods, task lifecycle, streaming, push configs
+  store.py        SQLite task + push-config store
+  push.py         the watcher thread that fires webhooks
+  httpd.py        agent card, HTTP routes, SSE writer
+  socrata.py      Socrata/SODA client base: caching, SOQL escaping, freshness
+  cli.py          one CLI for every server
+  smoke.py        shared smoke-check helper
+servers/<name>/   data.py (dataset client) · agent.py (skills) · server.py (main)
+                  tests/ · tools/smoke.py · .env.example
+tests/test_kit.py tests for the kit itself
+tools/            demo webhook receiver
+docs/             the gap research behind the "first of its kind" claims
+```
+
+A server is three files: a dataset client, a `SkillAgent` subclass (parse a message,
+run a skill, probe a watch), and a four-line `server.py`. The kit does the rest.
+
+## Tests
+
+```bash
+python3 tests/test_kit.py
+python3 servers/nyc311/tests/test_agent.py
+python3 servers/nycflood/tests/test_agent.py
+python3 servers/nycwater/tests/test_agent.py
+```
+
+99 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
+and retries, dataset validation, SOQL escaping, skill parsing, and one full
+in-process HTTP + SSE test.
+
+Live end-to-end smoke (hits the real NYC Open Data APIs):
+
+```bash
+# terminal 1
+NYC311_ALLOW_PRIVATE_WEBHOOKS=1 python3 servers/nyc311/server.py
+# terminal 2
+python3 servers/nyc311/tools/smoke.py
+```
+
+52 checks across the three smoke scripts: card, real lookup, `input-required`
+continuation, SSE stream, push-config CRUD.
+
+## Configuration
+
+Every server reads `.env.example` in its own directory (or real env vars). Each has
+its own prefix so the three can run side by side:
+
+| Variable | Purpose |
+|---|---|
+| `A2A_HOST` / `A2A_PORT` / `A2A_PUBLIC_URL` | Where the server listens and what the card advertises |
+| `A2A_PROVIDER_ORG` / `A2A_PROVIDER_URL` | Optional `provider` block in the card |
+| `<PREFIX>_APP_TOKEN` | Optional Socrata app token (raises rate limits; not required) |
+| `<PREFIX>_CACHE_TTL`, `<PREFIX>_HTTP_TIMEOUT` | Dataset caching and HTTP timeout |
+| `<PREFIX>_DB` | SQLite path for tasks + push configs |
+| `<PREFIX>_WATCH_INTERVAL` | Seconds between webhook watches (floor: 5) |
+| `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS` | `1` allows loopback webhook URLs — local demos only |
+
+Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`.
+
+## Honest limits
+
+- **A dry result is not proof of no flooding.** FloodNet publishes completed events,
+  so every flood answer states the window it looked at.
+- **Water results are per monitoring site, not per address.** DEP publishes site codes
+  without coordinates; the agent says so instead of guessing.
+- **311 is read-only.** There is no public API to *file* a complaint or pay a ticket;
+  the agent links and reports, never pretends.
+- **Private webhook URLs are blocked by default.** Allow them only for local demos.
+  Hostname webhooks are not DNS-resolved before use, so a determined caller could
+  point one at an internal name — put these servers behind an egress firewall.
+- **Rate limits.** No app token means light use only; the kit caches per query and
+  the watcher polls on a timer rather than per request.
+
+## Deploying
+
+These are plain `http.server` apps: fine behind a reverse proxy on a private network,
+not hardened for direct public exposure. Set `A2A_PUBLIC_URL` to the real external
+URL (the card embeds it), terminate TLS at the proxy, and keep
+`<PREFIX>_ALLOW_PRIVATE_WEBHOOKS=0`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
