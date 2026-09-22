@@ -354,9 +354,15 @@ def _missing_filters() -> dict:
 
 
 def _describe_search(params: dict) -> str:
+    """The sentence that names the search, in words a person would say out loud."""
     parts = []
     if params.get("classification"):
-        parts.append(f"{params['classification']} recalls")
+        # The router hands over the numeral it matched ("I"), so spell it back out.
+        try:
+            classification = check_classification(params["classification"])
+        except ValueError:
+            classification = params["classification"]
+        parts.append(f"{classification} recalls")
     elif params.get("scope"):
         parts.append(f"{_scope_label(params['scope'])} recalls")
     else:

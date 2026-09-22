@@ -322,6 +322,11 @@ class SkillTests(unittest.TestCase):
         request = {"skill": skill, "params": params, "missing": agent.missing(skill, params)}
         return agent.run(request)
 
+    def test_classification_is_spelled_out_in_prose(self):
+        result = self.run_skill("recalls-recent", scope="food", classification="I", days=30)
+        self.assertTrue(result["message"].startswith("149 Class I recalls in the last 30 days"),
+                        result["message"].splitlines()[0])
+
     def test_recent_cites_dataset_and_disclaimer(self):
         result = self.run_skill("recalls-recent", scope="food", days=30)
         self.assertEqual(result["final_state"], "completed")
