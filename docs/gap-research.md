@@ -46,11 +46,30 @@ Gaps from the list below that are now closed by code in this repository — list
 | A — government feeds with no agent face | NWS alerts, USGS earthquakes, NOAA tides, openFDA recalls, USGS volcano alert levels, NOAA NDBC buoy observations, FAA NAS airport status, Open-Meteo air quality (each previously had no card) | `servers/nws`, `servers/quakes`, `servers/tides`, `servers/recalls`, `servers/volcanoes`, `servers/buoys`, `servers/airports`, `servers/air` (a2a) |
 | G — real, unserved niches | Space weather (SWPC Kp + OVATION aurora probability) and wildfire (NIFC WFIGS incidents) | `servers/aurora`, `servers/fire` (a2a) |
 | #4 travel / transportation A2A (empty directory section) | Airport status by card: ground-delay programmes, arrival/departure windows and closures from the FAA's own snapshot | `servers/airports` (a2a) |
-| #2 non-coding ACP agents | Civic, hazards, Treasury, NHTSA vehicles, plus the ACP→A2A bridge | `acp` repo |
+| #2 non-coding ACP agents | Nine of them: civic (NYC open data), hazards (NWS + USGS), the Treasury ledger, NHTSA vehicles, NIFC wildfire, Open-Meteo air quality, NOAA space weather, USGS stream gauges, plus the ACP→A2A bridge | `acp` repo |
 | #10 ACP↔A2A bridge beyond coding | A bridge that also relays A2A push notifications into the editor session | `acp/agents/a2a_bridge` |
 
 Unbuilt gaps that remain open here: the official registry, card security scanning, certifiable
 conformance, smart-home, healthcare, travel booking, enterprise payment metering.
+
+---
+
+## 7b. The newest `acp` agents — gap checks (2026-09-24)
+
+Same method as §7: registries and directories first, then a targeted search for the closest
+existing thing. Only a live, fetchable editor-registered agent counts as *taken*; adjacent
+**MCP** servers and plain data APIs are named because that is all the gap consists of.
+
+| Claim | Closest existing thing found | Maps to | Verdict |
+|---|---|---|---|
+| First space-weather agent in an editor protocol | NOAA SWPC publishes the feeds, and Home Assistant users wire up aurora sensors by hand; nothing protocol-native surfaced in the ACP registry or in A2A directories | G — real, unserved niches (space weather) | 🟡 no public agent found |
+| First USGS stream-gauge agent in an editor protocol | USGS's own water services plus **several MCP servers** over the same NWIS API (`cyanheads/usgs-water-mcp-server`, `pgiffy/usgs-water-mcp`, Apify wrappers), and the Colorado DWR MCP server | A — public agency feeds with no agent face | 🟡 no public ACP/A2A card found; MCP neighbours named |
+
+Why 🟡 and not 🟢: the USGS water MCP servers already cover the same API, so the gap here is the
+*protocol face* (an editor agent with the site-file/values two-request design, straight-line
+distances and silent-gauge accounting), not the data. Read every "first" in the `acp` README as
+"no public editor agent or A2A card found on 2026-09-24" — and per §5, a private deployment would
+be invisible from here.
 
 ---
 
