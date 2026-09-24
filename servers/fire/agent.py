@@ -119,6 +119,8 @@ CARD_SKILLS = [
 ]
 
 _POINT_RE = re.compile(r"(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)")
+#: "5,000 acres" is a size, not a coordinate, so a point is never read straight off a size phrase.
+_ACRES_AFTER_RE = re.compile(r"\s*acres?\b", re.IGNORECASE)
 _ACRES_RE = re.compile(r"\b(?:over|above|at least|more than|greater than|bigger than|>=)?\s*([\d][\d,]*)\s*acres?\b",
                        re.IGNORECASE)
 _RADIUS_RE = re.compile(r"\bwithin\s+([\d][\d,]*)\s*(?:mi|mile|miles)\b", re.IGNORECASE)
@@ -130,6 +132,9 @@ _UNCONTAINED_WORDS = re.compile(r"\b(uncontained|not contained|out of control|ze
                                 re.IGNORECASE)
 _LOOKUP_WORDS = re.compile(r"\b(about|details?|tell me about|look ?up|search|find|named|called)\b", re.IGNORECASE)
 _NEAR_WORDS = re.compile(r"\b(near me|nearby|close by|closest|around here|nearby me|within \d+)\b", re.IGNORECASE)
+#: "near Gotham" names a place the built-in list may not know, and that must be refused
+#: rather than silently answered with the national list. "near me" stays place-less.
+_NEAR_PLACE_RE = re.compile(r"\b(?:near|around|close to)\s+(?!me\b)([A-Za-z][\w'\-]{1,30})", re.IGNORECASE)
 _NAME_RE = re.compile(r"\b(?:about|on|called|named|search for|look ?up|find)\s+(?:the\s+)?([A-Za-z][\w'\- ]{1,40}?)\s+(?:fire|incident)s?\b",
                       re.IGNORECASE)
 _CAPS_NAME_RE = re.compile(r"\b([A-Z][\w'\-]{2,})\s+(?:fire|incident)\b")
@@ -199,17 +204,35 @@ def radius_from_text(text: str) -> float | None:
     return None
 
 
+#: Words that can sit in front of "fire" without naming one ("find the fire", "any big fire").
+_NOT_A_NAME = frozenset({"the", "a", "an", "this", "that", "these", "those", "large", "big", "new",
+                         "any", "some", "every", "another", "other", "next", "latest", "wild"})
+
+
 def name_from_text(text: str) -> str | None:
     """'tell me about the Timber fire' -> Timber."""
     match = _NAME_RE.search(text)
     if match:
         candidate = match.group(1).strip()
         candidate = re.sub(r"^(?:the|a|an)\s+", "", candidate, flags=re.IGNORECASE)
-        if 2 <= len(candidate) <= 40 and candidate.lower() not in ("large", "big", "new", "any", "this"):
+        if 2 <= len(candidate) <= 40 and candidate.lower() not in _NOT_A_NAME:
             return candidate
     match = _CAPS_NAME_RE.search(text)
     if match:
         return match.group(1)
+    return None
+
+
+def point_from_text(text: str) -> str | None:
+    """A 'lat,lon' pair the caller spelled out — never the pieces of a thousands-separated size."""
+    for match in _POINT_RE.finditer(text):
+        latitude, longitude = match.group(1), match.group(2)
+        if _ACRES_AFTER_RE.match(text[match.end():]):
+            continue  # "over 5,000 acres"
+        digits = longitude.lstrip("-")
+        if len(digits) > 1 and digits.startswith("0"):
+            continue  # "12,345" — a thousands group, not a longitude
+        return f"{latitude},{longitude}"
     return None
 
 
@@ -229,11 +252,9 @@ def parse(message: dict) -> dict:
     limit = _first(data, "limit", default=10)
 
     if not point:
-        match = _POINT_RE.search(text)
-        if match:
-            point = f"{match.group(1)},{match.group(2)}"
+        point = point_from_text(text)
     if not place:
-        place = place_from_text(text)
+        place = place_from_text(text) or (match.group(1).lower() if (match := _NEAR_PLACE_RE.search(text)) else None)
     if not state:
         state = state_from_text(text)
     if min_acres is None:

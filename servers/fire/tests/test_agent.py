@@ -27,6 +27,7 @@ from agent import (  # noqa: E402
     name_from_text,
     parse,
     place_from_text,
+    point_from_text,
     radius_from_text,
     state_from_text,
 )
@@ -213,11 +214,28 @@ class ParseTests(unittest.TestCase):
 
     def test_acres_and_containment_filters(self):
         parsed = parse(_message("show me wildfires over 10,000 acres in CA"))
+        # The 10,000 is a size, so this is a filtered list and not a "near 10,000" lookup.
+        self.assertEqual(parsed["skill"], "fire-active")
         self.assertEqual(parsed["params"]["min_acres"], 10000.0)
+        self.assertEqual(parsed["params"]["state"], "CA")
+        self.assertNotIn("point", parsed["params"])
         self.assertEqual(acres_from_text("over 1,500 acres"), 1500.0)
         self.assertIsNone(acres_from_text("no numbers here"))
         uncontained = parse(_message("any uncontained fires in OR?"))
         self.assertEqual(uncontained["params"]["contained_below"], 50)
+
+    def test_a_size_phrase_is_never_read_as_a_point(self):
+        self.assertEqual(point_from_text("any fires near 39.74,-104.99?"), "39.74,-104.99")
+        self.assertIsNone(point_from_text("over 5,000 acres in Idaho"))
+        self.assertIsNone(point_from_text("12,345 acres burned"))
+        self.assertIsNone(point_from_text("nothing here"))
+
+    def test_near_by_an_unknown_place_is_refused_by_name(self):
+        parsed = parse(_message("any fires near Gotham?"))
+        self.assertEqual(parsed["skill"], "fire-near")
+        self.assertEqual(parsed["params"]["place"], "gotham")
+        # "near me" names nobody, so it stays a place-less near read.
+        self.assertNotIn("place", parse(_message("is anything burning near me?"))["params"])
 
     def test_near_by_point_and_city(self):
         by_point = parse(_message("any fires near 39.74,-104.99?"))
@@ -236,6 +254,9 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(lookup["params"]["name"], "Timber")
         self.assertEqual(name_from_text("details on the Plaskett fire"), "Plaskett")
         self.assertIsNone(name_from_text("how many fires are there"))
+        # "the" in front of "fire" is an article, not an incident name.
+        self.assertIsNone(name_from_text("find the fire"))
+        self.assertIsNone(name_from_text("any big fire"))
 
     def test_watch_with_a_default_threshold(self):
         parsed = parse(_message("tell me when a new large fire starts in Oregon"))
