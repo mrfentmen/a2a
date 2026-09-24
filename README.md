@@ -1,5 +1,11 @@
 # a2a — Agent2Agent servers for public data
 
+[![Agent2Agent Protocol 0.3.0](https://img.shields.io/badge/A2A-0.3.0-000000)](https://a2a-protocol.org)
+
+Speaks the **Agent2Agent (A2A) protocol**, the open agent-to-agent standard now under the
+Linux Foundation. Registered agents are listed in the Global A2A Registry under the GitHub
+identity `mrfentmen`, so any A2A client can discover them by capability instead of by URL.
+
 Fourteen A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
 speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
 notifications when the public data it watches changes.
