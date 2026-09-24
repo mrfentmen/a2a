@@ -43,8 +43,9 @@ Gaps from the list below that are now closed by code in this repository — list
 |---|---|---|
 | #3 city / municipal A2A | NYC 311 agent card, live on NYC Open Data | `servers/nyc311` (a2a) |
 | A — municipal sensor nets | FloodNet street-flooding agent with a flood watch; DEP tap-water agent | `servers/nycflood`, `servers/nycwater` (a2a) |
-| A — government feeds with no agent face | NWS alerts, USGS earthquakes, NOAA tides, openFDA recalls (each previously had no card) | `servers/nws`, `servers/quakes`, `servers/tides`, `servers/recalls` (a2a) |
+| A — government feeds with no agent face | NWS alerts, USGS earthquakes, NOAA tides, openFDA recalls, USGS volcano alert levels, NOAA NDBC buoy observations, FAA NAS airport status, Open-Meteo air quality (each previously had no card) | `servers/nws`, `servers/quakes`, `servers/tides`, `servers/recalls`, `servers/volcanoes`, `servers/buoys`, `servers/airports`, `servers/air` (a2a) |
 | G — real, unserved niches | Space weather (SWPC Kp + OVATION aurora probability) and wildfire (NIFC WFIGS incidents) | `servers/aurora`, `servers/fire` (a2a) |
+| #4 travel / transportation A2A (empty directory section) | Airport status by card: ground-delay programmes, arrival/departure windows and closures from the FAA's own snapshot | `servers/airports` (a2a) |
 | #2 non-coding ACP agents | Civic, hazards, Treasury, NHTSA vehicles, plus the ACP→A2A bridge | `acp` repo |
 | #10 ACP↔A2A bridge beyond coding | A bridge that also relays A2A push notifications into the editor session | `acp/agents/a2a_bridge` |
 
@@ -296,3 +297,22 @@ Primary pages for §1–§3 were opened and read directly; the row-level links b
 - Enterprise marketplaces — https://www.salesforce.com/agentforce/agentexchange/ · https://aws.amazon.com/blogs/machine-learning/manage-agents-tools-and-skills-at-scale-with-aws-agent-registry/
 - A2A reality check (observability, marketplaces, security) — https://www.glukhov.org/ai-systems/comparisons/a2a-protocol-2026-adoption/
 - IBM's BeeAI ACP (communication protocol, merged into A2A) — https://www.ibm.com/think/topics/agent-communication-protocol
+
+---
+
+## 7. The four newest servers — gap checks (2026-09-23)
+
+Checked the same way as §3: registries and directories first, then a targeted search for the closest
+existing thing. Per §4, only a live, fetchable Agent Card counts as *taken*; adjacent **MCP** servers
+and plain data APIs are named because that is all the gap consists of.
+
+| Claim | Closest existing thing found | Maps to | Verdict |
+|---|---|---|---|
+| First air-quality A2A server | Open-Meteo, CAMS and AirNow publish the data, and MCP servers and AQI apps wrap it; no agent card found | new (atmospheric / environmental feeds) | 🟡 no public card found |
+| First volcano alert-level A2A server | USGS's Volcano Notification Service emails subscribers and the VSC API is public, but nothing protocol-native; AVO and GVP publish pages only | A16 (federal agency card) | 🟡 no public card found |
+| First marine-buoy A2A server | `cyanheads/noaa-marine-mcp-server` (**MCP**, covers NDBC buoys and tides), a Home Assistant NDBC integration, and an apis.io catalogue entry for the API itself | A (oceanographic feeds with no agent face) | 🟡 no public card found |
+| First airport-status A2A server | Flight-tracking MCP servers, airline apps and the FAA's own status page; no live card | #4 travel & transportation (empty category) · B1 airline booking | 🟡 no public card found |
+
+Why 🟡 and not 🟢: these four are each a single agency feed, not a whole vertical, so they get the
+weaker mark even though nothing surfaced on the day. Read every "first" in `README.md` as "no public
+agent card found on 2026-09-23" — and per §5, a private deployment would be invisible from here.

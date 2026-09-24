@@ -212,9 +212,9 @@ Two of the earlier §3 limits still hold after this sweep: there is **no** publi
 
 ## 9. Non-NYC datasets, verified for the later servers
 
-Each row was probed live on 2026-09-22 with a real request returning real rows (that is how the
-field lists and quirks in the servers' `data.py` docstrings were written, not from documentation).
-All keyless unless noted.
+Each row was probed live with a real request returning real rows (that is how the field lists and
+quirks in the servers' `data.py` docstrings were written, not from documentation). The rows for
+NWS through WFIGS were probed on 2026-09-22; the last four were probed on 2026-09-23. All keyless.
 
 | Dataset | Endpoint | Verified with | Fields used | Server |
 |---|---|---|---|---|
@@ -224,6 +224,10 @@ All keyless unless noted.
 | openFDA drug / food / device enforcement | `api.fda.gov/{drug,food,device}/enforcement.json` | `count=classification.exact` + a real record | recall_number, classification, product_description, reason_for_recall, status, report_date, distribution_pattern | `servers/recalls` |
 | NOAA SWPC: Kp (1-minute, 3-hourly, forecast), alerts, OVATION | `services.swpc.noaa.gov/products/noaa-planetary-k-index.json`, `.../-forecast.json`, `.../alerts.json`, `/json/planetary_k_index_1m.json`, `/json/ovation_aurora_latest.json` | live rows for each, including the 65,160-cell OVATION grid | time_tag, Kp, estimated_kp, a_running, observed/predicted, product_id/issue_datetime/message, coordinates [lon, lat, probability] | `servers/aurora` |
 | NIFC WFIGS current incidents | `services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query` | `returnCountOnly` (450 rows), a state filter, and a 100-mile distance query | IncidentName, IncidentSize, PercentContained, FireDiscoveryDateTime (epoch ms), IncidentTypeCategory, POOState, POOCounty, FireCause, GACC, UniqueFireIdentifier, geometry x/y | `servers/fire` |
+| Open-Meteo air quality | `air-quality-api.open-meteo.com/v1/air-quality` | point and city queries, 1-hour and 6-hour forecasts, and the bad-request path | current + hourly US AQI, pm2_5, pm10, ozone, nitrogen_dioxide, sulphur_dioxide, carbon_monoxide, uv_index, alder/birch/grass/ragweed/mugwort/olive pollen; multiple coordinates return an array | `servers/air` |
+| USGS Volcano Science Center alert levels | `volcanoes.usgs.gov/vsc/api/volcanoApi/elevated` and `.../geojson` | the live elevated list, plus the 161-volcano geojson catalogue | volcano_name, alert_level, color_code, observatory, region, threat_ranking, latitude/longitude, notice synopsis | `servers/volcanoes` |
+| NOAA NDBC real-time observations | `www.ndbc.noaa.gov/data/latest_obs/latest_obs.txt`, `/data/realtime2/<id>.txt`, `www.ndbc.noaa.gov/activestations.xml` | the 872-row latest-observation table, one station's history file, and the 1,354-station catalogue | station id, time, WDIR/WSPD/GST/WVHT/DPD/APD/MWD/PRES/ATMP/WTMP/DEWP/VIS/TIDE, station name, owner, programme, sensors, lat/lon | `servers/buoys` |
+| FAA NAS airport status | `www.fly.faa.gov/flyfaa/xmlAirportStatus.jsp` | a live snapshot (~1.8 KB) with both its delay and closure blocks | ARPT, Update_Time, Delay_type (arrival/departure/ground/closure), Reason, Arrival/Departure delay ranges, closure start and reopen | `servers/airports` |
 
 Quirks worth remembering (all handled in the servers):
 
@@ -233,3 +237,18 @@ Quirks worth remembering (all handled in the servers):
   its dates are epoch milliseconds; the layer caps a response at 2,000 rows.
 - An unknown make or model on NHTSA's recall API answers HTTP 400 with an empty result set (used by
   the `acp` repo's vehicles agent, same idea).
+- Open-Meteo signals a bad request with HTTP 400 and `{"error": true, "reason": "…"}` — `error` is a
+  boolean, not a string, so a client that only tests `payload.get("error")` for truthiness will treat
+  the failure body as data. The air server overrides the kit's HTTP hook for that reason.
+- The Volcano Science Center serves only `elevated` and `geojson`: the legacy
+  `volcanoApi/volcanoes`, `/status` and `/volcanoDetails` paths 404, and the Smithsonian GVP answers
+  403. A `geojson` read measured 12-76 s on the same document, so the server allows 90 s and caches
+  for 15 minutes. Coordinates in the geojson are `[longitude, latitude]`, the reverse of the
+  elevated list's named fields — worth checking before mapping either one.
+- NDBC's station catalogue is at `/activestations.xml`; `/data/activestations.xml` 404s. The
+  latest-observation table is one row per station with `MM` in a column whose sensor is out (so a
+  station can publish wind and no sea state), and the per-station `/data/realtime2/<id>.txt` files are
+  newest-first, unlike the table.
+- The FAA status document is one XML snapshot whose two blocks can both be named "Airport Closures"
+  when a delay programme and a closure are reported together; it lists only airports with something to
+  report, so absence means "not affected", not "on time".

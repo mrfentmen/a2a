@@ -1,6 +1,6 @@
 # a2a — Agent2Agent servers for public data
 
-Nine A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
+Thirteen A2A servers, one shared stdlib-only kit. Each server publishes a real agent card,
 speaks A2A 0.3.0 JSON-RPC, streams task updates over SSE, and POSTs webhook
 notifications when the public data it watches changes.
 
@@ -18,11 +18,16 @@ production paths.
 | [`servers/recalls`](servers/recalls) | openFDA Recalls Agent | `recalls-recent`, `recall-search`, `recalls-summary`, `recall-lookup`, `recalls-watch` | First product-recall agent: openFDA drug, food and device enforcement reports (87,000+ records), with counts by classification and a new-recall watch |
 | [`servers/aurora`](servers/aurora) | Aurora Space Weather Agent | `aurora-now`, `aurora-forecast`, `aurora-visibility`, `aurora-messages`, `aurora-watch` | First space-weather agent: NOAA SWPC's Kp index and storm messages, plus the OVATION model's aurora probability at any point, with a storm watch |
 | [`servers/fire`](servers/fire) | Wildfire Incident Agent | `fire-active`, `fire-near`, `fire-summary`, `fire-lookup`, `fire-watch` | First wildfire agent: the interagency WFIGS incident layer (active fires, acreage, containment, real distances), with a new-large-fire watch |
+| [`servers/air`](servers/air) | Air Quality Agent | `air-now`, `air-forecast`, `air-ranking`, `air-watch` | First air-quality agent: Open-Meteo's keyless model run — US AQI with its EPA band, PM2.5/PM10, ozone, NO₂, SO₂, CO, UV and pollen by point or city, a 72-hour hourly outlook, and a band-change watch |
+| [`servers/volcanoes`](servers/volcanoes) | Volcano Alert-Level Agent | `volcano-alerts`, `volcano-list`, `volcano-lookup`, `volcano-watch` | First volcano agent: the USGS Volcano Science Center's alert levels — which volcanoes are above NORMAL with the observatory's own synopsis, the monitored list by region and level, colour code and threat ranking per volcano, and an alert-change watch |
+| [`servers/buoys`](servers/buoys) | NDBC Buoy Agent | `buoy-conditions`, `buoy-trend`, `buoys-near`, `buoys-list`, `buoy-watch` | First marine-buoy agent: NOAA's National Data Buoy Center — the newest observation at any of 1,354 stations, the nearest reporting station to a coastal place, per-station trends with lows and highs, and a wave/wind crossing watch that states missing sensors instead of smoothing them |
+| [`servers/airports`](servers/airports) | FAA Airport Status Agent | `airport-status`, `airports-delays`, `airports-closures`, `airport-watch` | First airport-status agent: the FAA's NAS snapshot — ground-delay programmes, arrival and departure delay windows and closures by code or city, worst-first systemwide with the FAA's own reason text, and an appear/clear watch |
 
 Public A2A servers today are almost all crypto bots, dev tooling, and B2B AI shops.
 No city, water utility, weather service, geological survey, oceanographic service, food
-safety regulator, space-weather center, land-management agency, transit agency, or
-hospital publishes an agent card. These nine take
+safety regulator, space-weather center, land-management agency, air-quality modeller,
+volcanology observatory, aviation regulator, transit agency, or hospital publishes an
+agent card. These thirteen take
 the first slots in that gap — see [`docs/gap-research.md`](docs/gap-research.md) for the
 survey behind that claim (and its caveats).
 
@@ -39,6 +44,10 @@ python3 servers/tides/server.py         # http://127.0.0.1:8793
 python3 servers/aurora/server.py        # http://127.0.0.1:8794
 python3 servers/fire/server.py          # http://127.0.0.1:8795
 python3 servers/recalls/server.py       # http://127.0.0.1:8796
+python3 servers/air/server.py           # http://127.0.0.1:8797  (Open-Meteo, keyless)
+python3 servers/volcanoes/server.py     # http://127.0.0.1:8798
+python3 servers/buoys/server.py         # http://127.0.0.1:8800
+python3 servers/airports/server.py      # http://127.0.0.1:8801
 
 # terminal 2 — optional: watch pushes arrive
 python3 tools/webhook_receiver.py --port 8799
@@ -104,9 +113,13 @@ python3 servers/tides/tests/test_agent.py
 python3 servers/aurora/tests/test_agent.py
 python3 servers/fire/tests/test_agent.py
 python3 servers/recalls/tests/test_agent.py
+python3 servers/air/tests/test_agent.py
+python3 servers/volcanoes/tests/test_agent.py
+python3 servers/buoys/tests/test_agent.py
+python3 servers/airports/tests/test_agent.py
 ```
 
-307 unit tests: task lifecycle, streaming, push-config validation, webhook delivery
+489 unit tests (462 across the thirteen servers, 27 for the kit): task lifecycle, streaming, push-config validation, webhook delivery
 and retries, dataset validation, SOQL escaping, skill parsing, and one full
 in-process HTTP + SSE test.
 
@@ -119,8 +132,8 @@ NYC311_ALLOW_PRIVATE_WEBHOOKS=1 python3 servers/nyc311/server.py
 python3 servers/nyc311/tools/smoke.py
 ```
 
-202 checks across the nine smoke scripts: card, real lookup, `input-required`
-continuation, SSE stream, push-config CRUD. One command runs all nine:
+313 checks across the thirteen smoke scripts: card, real lookup, `input-required`
+continuation, SSE stream, push-config CRUD. One command runs all thirteen:
 
 ```bash
 python3 tools/smoke_all.py
@@ -129,7 +142,7 @@ python3 tools/smoke_all.py
 ## Configuration
 
 Every server reads `.env.example` in its own directory (or real env vars). Each has
-its own prefix so the three can run side by side:
+its own prefix so all thirteen can run side by side:
 
 | Variable | Purpose |
 |---|---|
@@ -142,17 +155,23 @@ its own prefix so the three can run side by side:
 | `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS` | `1` allows loopback webhook URLs — local demos only |
 
 Prefixes: `NYC311`, `NYC_FLOOD`, `NYC_WATER`, `NWS`, `USGS`, `NOAA_TIDES`, `AURORA`, `FIRE`,
-`OPENFDA`.
+`OPENFDA`, `AIR`, `VOLCANO`, `BUOY`, `FAA`.
 
 `NWS_USER_AGENT`, `USGS_USER_AGENT` and `NOAA_TIDES_USER_AGENT` matter: those agencies
 ask that callers identify themselves with a contactable address, and NWS returns 403
 without one. SWPC and NIFC are happy keyless, so `AURORA_USER_AGENT` and `FIRE_USER_AGENT`
 are good manners rather than requirements. `OPENFDA_API_KEY` is optional — openFDA works keyless and a key only
-raises the rate limit to 240 requests/minute.
+raises the rate limit to 240 requests/minute. Open-Meteo, the USGS Volcano Science Center,
+NOAA's buoy centre and the FAA status feed are keyless too, so `AIR_USER_AGENT`,
+`VOLCANO_USER_AGENT`, `BUOY_USER_AGENT` and `FAA_USER_AGENT` are manners rather than gates
+(NWS and the volcano science center return 403 without any agent at all).
 
 NOAA's tide server also reads `NOAA_TIDES_UNITS` (feet or metres), `NOAA_TIDES_DATUM`
 (the reference level heights are measured from, default MLLW) and
 `NOAA_TIDES_STATION_TTL` (the 2 MB station catalogue cache, default one day).
+
+The buoys server reads `BUOY_UNITS` — `english` (mph, ft, °F, inHg; the default) or `metric`
+(m/s, m, °C, hPa, which is how NDBC itself publishes).
 
 ## Honest limits
 
@@ -184,7 +203,26 @@ NOAA's tide server also reads `NOAA_TIDES_UNITS` (feet or metres), `NOAA_TIDES_D
   point and are not a risk assessment or an evacuation notice.
 - **openFDA records are unvalidated.** The agency's own disclaimer travels in every
   recall answer, recalls can be corrected or withdrawn after publication, and an empty
-  result means "nothing published matches" — not "nothing is happening".
+  result means "nothing published matches" — not "nothing is happening". Reports arrive in
+  batches, so the newest `report_date` can be a week or more behind today and a short
+  window can honestly return nothing.
+- **Air-quality answers are model output on a grid, not a monitor on your street.**
+  Open-Meteo serves modelled fields interpolated to the point or city you name, so the
+  reading is the model's cell rather than a sensor reading; every answer names the source
+  product it came from, and an unplaceable name is refused instead of guessed.
+- **Volcano alert levels are an observatory's judgement, not a measurement.** USGS sets
+  them by decision and they change rarely, so "unchanged" is the normal answer; the alert
+  skill lists only volcanoes above NORMAL, and the catalogue is the currently monitored
+  set (161 volcanoes and seamounts), not every volcano on Earth.
+- **A buoy reading is one spot in one ocean.** NDBC stations are tens to hundreds of miles
+  apart, so "buoys near me" means the nearest reporting station, not a local measurement;
+  sensors drop out one at a time and read `MM`, which the agent reports as missing rather
+  than interpolating — and a watch will not start on a field the station is not publishing
+  right now.
+- **The FAA snapshot only lists airports that are affected.** An airport with nothing to
+  report is absent from the feed, not "on time"; the feed is revised every few minutes, so
+  every answer is as-of its snapshot time; and a "closure" in the list is often a runway or
+  taxiway closure, not the whole airport.
 - **Rate limits.** No app token means light use only; the kit caches per query and
   the watcher polls on a timer rather than per request.
 

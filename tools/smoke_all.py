@@ -8,7 +8,11 @@ touches committed data) and `<PREFIX>_ALLOW_PRIVATE_WEBHOOKS=1` so the push-conf
 checks can register a loopback webhook. Exits non-zero if any server fails.
 
 Live network: every check reads the real upstream API (NYC Open Data, NWS, USGS, NOAA
-SWPC, NIFC, openFDA).
+SWPC, NIFC, openFDA, Open-Meteo, USGS VSC, NDBC, FAA).
+
+One server is slow by nature: the USGS Volcano Science Center API answered in 12-76s per read
+on 2026-09-23, so `servers/volcanoes/tools/smoke.py` raises its own client timeout and this
+run takes a couple of minutes longer because of it.
 """
 
 from __future__ import annotations
@@ -36,6 +40,10 @@ SERVERS = (
     ("aurora", 8794, "AURORA", "AURORA_USER_AGENT"),
     ("fire", 8795, "FIRE", "FIRE_USER_AGENT"),
     ("recalls", 8796, "OPENFDA", "OPENFDA_USER_AGENT"),
+    ("air", 8797, "AIR", "AIR_USER_AGENT"),
+    ("volcanoes", 8798, "VOLCANO", "VOLCANO_USER_AGENT"),
+    ("buoys", 8800, "BUOY", "BUOY_USER_AGENT"),
+    ("airports", 8801, "FAA", "FAA_USER_AGENT"),
 )
 
 USER_AGENT = "a2a-smoke-all/1.0 (+https://github.com/mrfentmen/a2a)"

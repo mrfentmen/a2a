@@ -41,9 +41,11 @@ def main(argv=None) -> int:
     ):
         return 1
 
-    # Live: the newest records across all three registers.
+    # Live: the newest records across all three registers. The window is wide on purpose:
+    # openFDA publishes enforcement reports in batches, so the newest report_date can be a
+    # week or more behind today and a 7-day window honestly returns nothing.
     recent = smoke.rpc(
-        "message/send", {"message": smoke.user_message("what was recalled in the last 7 days?")}
+        "message/send", {"message": smoke.user_message("what was recalled in the last 30 days?")}
     ).get("result", {})
     recent_data = artifact_data(recent)
     recalls = recent_data.get("recalls") or []
