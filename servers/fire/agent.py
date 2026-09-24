@@ -223,6 +223,11 @@ def name_from_text(text: str) -> str | None:
     return None
 
 
+def where_label(label: str, lat: float, lon: float) -> str:
+    """'Denver (39.74,-104.99)', but not 'the point 39.74,-104.99 (39.74,-104.99)'."""
+    return label if label.startswith("the point") else f"{label} ({lat},{lon})"
+
+
 def point_from_text(text: str) -> str | None:
     """A 'lat,lon' pair the caller spelled out — never the pieces of a thousands-separated size."""
     for match in _POINT_RE.finditer(text):
@@ -230,8 +235,9 @@ def point_from_text(text: str) -> str | None:
         if _ACRES_AFTER_RE.match(text[match.end():]):
             continue  # "over 5,000 acres"
         digits = longitude.lstrip("-")
-        if len(digits) > 1 and digits.startswith("0"):
-            continue  # "12,345" — a thousands group, not a longitude
+        # "12,345" is a thousands group; "-0.13" is London.
+        if "." not in digits and len(digits) > 1 and digits.startswith("0"):
+            continue
         return f"{latitude},{longitude}"
     return None
 
@@ -389,12 +395,13 @@ def run_fire_near(params: dict, client: WildfireClient) -> dict:
     if not result["count"]:
         return {
             "final_state": "completed",
-            "message": f"No active wildfire is listed within {radius:g} miles of {label} ({lat},{lon}) "
+            "message": f"No active wildfire is listed within {radius:g} miles of {where_label(label, lat, lon)} "
                        f"right now. (Read live from NIFC's interagency incident layer, {DATASET}.)",
             "artifact": artifact,
             "watch": None,
         }
-    lines = [f"{result['count']} active wildfire(s) within {radius:g} miles of {label} ({lat},{lon}), nearest first:"]
+    lines = [f"{result['count']} active wildfire(s) within {radius:g} miles of "
+             f"{where_label(label, lat, lon)}, nearest first:"]
     lines.extend(_fire_line(row, distance=True) for row in result["incidents"][:8])
     lines.append(f"\nDistances are great-circle miles from that point to the reported fire location, "
                  f"computed here from {DATASET}. Distance is not risk: smoke, wind and terrain decide "

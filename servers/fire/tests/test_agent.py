@@ -226,6 +226,8 @@ class ParseTests(unittest.TestCase):
 
     def test_a_size_phrase_is_never_read_as_a_point(self):
         self.assertEqual(point_from_text("any fires near 39.74,-104.99?"), "39.74,-104.99")
+        # A zero longitude is a coordinate too (Greenwich), not a thousands group.
+        self.assertEqual(point_from_text("any fires near 51.51,-0.13?"), "51.51,-0.13")
         self.assertIsNone(point_from_text("over 5,000 acres in Idaho"))
         self.assertIsNone(point_from_text("12,345 acres burned"))
         self.assertIsNone(point_from_text("nothing here"))
