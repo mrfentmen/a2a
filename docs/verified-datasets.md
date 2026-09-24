@@ -228,6 +228,7 @@ NWS through WFIGS were probed on 2026-09-22; the last four were probed on 2026-0
 | USGS Volcano Science Center alert levels | `volcanoes.usgs.gov/vsc/api/volcanoApi/elevated` and `.../geojson` | the live elevated list, plus the 161-volcano geojson catalogue | volcano_name, alert_level, color_code, observatory, region, threat_ranking, latitude/longitude, notice synopsis | `servers/volcanoes` |
 | NOAA NDBC real-time observations | `www.ndbc.noaa.gov/data/latest_obs/latest_obs.txt`, `/data/realtime2/<id>.txt`, `www.ndbc.noaa.gov/activestations.xml` | the 872-row latest-observation table, one station's history file, and the 1,354-station catalogue | station id, time, WDIR/WSPD/GST/WVHT/DPD/APD/MWD/PRES/ATMP/WTMP/DEWP/VIS/TIDE, station name, owner, programme, sensors, lat/lon | `servers/buoys` |
 | FAA NAS airport status | `www.fly.faa.gov/flyfaa/xmlAirportStatus.jsp` | a live snapshot (~1.8 KB) with both its delay and closure blocks | ARPT, Update_Time, Delay_type (arrival/departure/ground/closure), Reason, Arrival/Departure delay ranges, closure start and reopen | `servers/airports` |
+| Aviation Weather Center METAR + TAF | `aviationweather.gov/api/data/metar`, `.../taf` (probed 2026-09-24) | a station query, a three-station query, a 35-station Colorado bbox, and the unknown-code path | icaoId, reportTime/obsTime, temp, dewp, wdir/wspd/wgst, visib, altim, slp, clouds (cover + base), cover, fltCat, rawOb, name, lat/lon, elev; TAF issueTime, validTimeFrom/To, rawTAF, fcsts (timeFrom/To, wdir/wspd/wgst, visib, wxString, probability, clouds, vertVis) | `servers/aviation` |
 
 Quirks worth remembering (all handled in the servers):
 
@@ -252,3 +253,11 @@ Quirks worth remembering (all handled in the servers):
 - The FAA status document is one XML snapshot whose two blocks can both be named "Airport Closures"
   when a delay programme and a closure are reported together; it lists only airports with something to
   report, so absence means "not affected", not "on time".
+- The Aviation Weather Center resolves **ICAO** ids only: `ids=DEN`, `ids=JFK` and `ids=MDW` answer
+  HTTP 204 with an empty body, while `ids=KDEN`, `ids=KJFK` and `ids=KMDW` answer with the report — so
+  a bare FAA code is indistinguishable from a code that does not exist, and the server promotes DEN to
+  KDEN before asking. The same 204-with-no-body reply is how the service reports an unknown code, which
+  is why an empty body is read as "no observation published" rather than as an error. Most decoded
+  fields are optional (`wgst`, `visib`, `altim`, `slp`, `clouds`, `wxString`), visibility arrives as
+  the string `"10+"` when it is capped, and `fltCat` (VFR/MVFR/IFR/LIFR) is the service's own category —
+  the server reports it and never derives one.

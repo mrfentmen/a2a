@@ -44,6 +44,7 @@ SERVERS = (
     ("volcanoes", 8798, "VOLCANO", "VOLCANO_USER_AGENT"),
     ("buoys", 8800, "BUOY", "BUOY_USER_AGENT"),
     ("airports", 8801, "FAA", "FAA_USER_AGENT"),
+    ("aviation", 8802, "AVIATION", "AVIATION_USER_AGENT"),
 )
 
 USER_AGENT = "a2a-smoke-all/1.0 (+https://github.com/mrfentmen/a2a)"

@@ -331,7 +331,8 @@ and plain data APIs are named because that is all the gap consists of.
 | First volcano alert-level A2A server | USGS's Volcano Notification Service emails subscribers and the VSC API is public, but nothing protocol-native; AVO and GVP publish pages only | A16 (federal agency card) | 🟡 no public card found |
 | First marine-buoy A2A server | `cyanheads/noaa-marine-mcp-server` (**MCP**, covers NDBC buoys and tides), a Home Assistant NDBC integration, and an apis.io catalogue entry for the API itself | A (oceanographic feeds with no agent face) | 🟡 no public card found |
 | First airport-status A2A server | Flight-tracking MCP servers, airline apps and the FAA's own status page; no live card | #4 travel & transportation (empty category) · B1 airline booking | 🟡 no public card found |
+| First aviation-weather A2A server (METAR + TAF) | The Aviation Weather Center's own API and pages, plus weather MCP servers that name METAR among their tools; no live card, and nothing found that publishes flight category and TAF periods as an agent skill | #4 travel & transportation (empty category) · new (aviation meteorology) | 🟡 no public card found |
 
-Why 🟡 and not 🟢: these four are each a single agency feed, not a whole vertical, so they get the
+Why 🟡 and not 🟢: these are each a single agency feed, not a whole vertical, so they get the
 weaker mark even though nothing surfaced on the day. Read every "first" in `README.md` as "no public
 agent card found on 2026-09-23" — and per §5, a private deployment would be invisible from here.
